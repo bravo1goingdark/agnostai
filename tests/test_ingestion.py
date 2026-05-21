@@ -1,6 +1,5 @@
-from collections.abc import AsyncGenerator
-
 import pytest
+import pytest_asyncio
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
@@ -14,11 +13,8 @@ from app.services.ingestion import (
 )
 
 
-@pytest.fixture
-async def session_factory() -> AsyncGenerator[
-    async_sessionmaker[AsyncSession],
-    None,
-]:
+@pytest_asyncio.fixture
+async def session_factory():
     engine = create_async_engine(
         "sqlite+aiosqlite://",
         connect_args={"check_same_thread": False},
@@ -27,11 +23,7 @@ async def session_factory() -> AsyncGenerator[
     async with engine.begin() as connection:
         await connection.run_sync(
             Base.metadata.create_all,
-            tables=[
-                Project.__table__,
-                Conversation.__table__,
-                ProcessingJob.__table__,
-            ],
+            tables=[Project.__table__, Conversation.__table__, ProcessingJob.__table__],
         )
     try:
         yield async_sessionmaker(engine, expire_on_commit=False)

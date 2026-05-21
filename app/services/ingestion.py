@@ -7,11 +7,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.schemas import ConversationIngestRequest, ConversationIngestResponse
 from app.models.tables import Conversation, ProcessingJob, Project
+from app.workers.queue import (
+    QueueFactory,
+    create_queue,
+    enqueue_process_conversation_via_factory,
+)
 
 
 async def enqueue_conversation_ingest(
     payload: ConversationIngestRequest,
     session: AsyncSession,
+    queue_factory: QueueFactory | None = None,
 ) -> ConversationIngestResponse:
     """Persist raw conversation input and record a queued processing job."""
     content_hash = conversation_content_hash(payload)
@@ -47,11 +53,17 @@ async def enqueue_conversation_ingest(
     session.add(job)
     await session.commit()
 
+    job_id = await enqueue_process_conversation_via_factory(
+        queue_factory if queue_factory is not None else create_queue,
+        payload.project_id,
+        str(conversation.id),
+    )
+
     return ConversationIngestResponse(
         project_id=payload.project_id,
         conversation_id=payload.conversation_id,
         status="accepted",
-        job_id=str(job.id),
+        job_id=job_id or str(job.id),
         stored_conversation_id=str(conversation.id),
     )
 

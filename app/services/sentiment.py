@@ -12,3 +12,6 @@ def score_sentiment_stub(text: str) -> tuple[float, SentimentLabel]:
         return 0.5, "positive"
     return 0.0, "neutral"
 
+
+def is_user_message(role: str) -> bool:
+    return role == "user"
