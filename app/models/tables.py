@@ -145,7 +145,10 @@ class MessageEmbedding(Base):
     )
     model_name: Mapped[str] = mapped_column(String(255), nullable=False)
     dimension: Mapped[int] = mapped_column(Integer, nullable=False)
-    embedding: Mapped[list[float]] = mapped_column(Vector(384), nullable=False)
+    embedding: Mapped[list[float]] = mapped_column(
+        Vector(384).with_variant(JSON(), "sqlite"),
+        nullable=False,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

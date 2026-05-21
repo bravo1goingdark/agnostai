@@ -1,6 +1,6 @@
 from collections.abc import Awaitable, Callable
 from datetime import timedelta
-from typing import Any, Protocol, TypeAlias, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 from arq.connections import RedisSettings, create_pool
 
@@ -26,7 +26,7 @@ class QueueClient(Protocol):
     async def aclose(self) -> None: ...
 
 
-QueueFactory: TypeAlias = Callable[[], Awaitable[QueueClient]]
+type QueueFactory = Callable[[], Awaitable[QueueClient]]
 
 
 async def create_queue() -> QueueClient:
