@@ -30,4 +30,4 @@ class ConversationIngestResponse(BaseModel):
     conversation_id: str
     status: Literal["accepted", "duplicate"]
     job_id: str | None = None
-
+    stored_conversation_id: str | None = None
