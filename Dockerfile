@@ -11,6 +11,8 @@ RUN groupadd --system agnost \
 
 COPY pyproject.toml README.md ./
 COPY app ./app
+COPY alembic.ini ./
+COPY alembic ./alembic
 
 ARG PACKAGE_EXTRAS=""
 RUN pip install --upgrade pip \

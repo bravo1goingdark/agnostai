@@ -13,6 +13,22 @@ from app.services.ingestion import (
 )
 
 
+class FakeJob:
+    job_id = "queued-job-1"
+
+
+class FakeRedis:
+    async def enqueue_job(self, *args: object, **kwargs: object) -> FakeJob:
+        return FakeJob()
+
+    async def aclose(self) -> None:
+        return None
+
+
+async def fake_queue_factory() -> FakeRedis:
+    return FakeRedis()
+
+
 @pytest_asyncio.fixture
 async def session_factory():
     engine = create_async_engine(
@@ -62,7 +78,11 @@ async def test_ingest_persists_project_conversation_and_job(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
     async with session_factory() as session:
-        response = await enqueue_conversation_ingest(sample_payload(), session)
+        response = await enqueue_conversation_ingest(
+            sample_payload(),
+            session,
+            queue_factory=fake_queue_factory,
+        )
 
         assert response.status == "accepted"
         assert response.job_id is not None
@@ -87,8 +107,16 @@ async def test_ingest_dedupes_by_external_id(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
     async with session_factory() as session:
-        first = await enqueue_conversation_ingest(sample_payload(), session)
-        second = await enqueue_conversation_ingest(sample_payload(), session)
+        first = await enqueue_conversation_ingest(
+            sample_payload(),
+            session,
+            queue_factory=fake_queue_factory,
+        )
+        second = await enqueue_conversation_ingest(
+            sample_payload(),
+            session,
+            queue_factory=fake_queue_factory,
+        )
 
         conversations = (await session.execute(select(Conversation))).scalars().all()
         jobs = (await session.execute(select(ProcessingJob))).scalars().all()
@@ -105,8 +133,16 @@ async def test_ingest_dedupes_by_content_hash(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
     async with session_factory() as session:
-        first = await enqueue_conversation_ingest(sample_payload("conv-1"), session)
-        second = await enqueue_conversation_ingest(sample_payload("conv-2"), session)
+        first = await enqueue_conversation_ingest(
+            sample_payload("conv-1"),
+            session,
+            queue_factory=fake_queue_factory,
+        )
+        second = await enqueue_conversation_ingest(
+            sample_payload("conv-2"),
+            session,
+            queue_factory=fake_queue_factory,
+        )
 
         conversations = (await session.execute(select(Conversation))).scalars().all()
         jobs = (await session.execute(select(ProcessingJob))).scalars().all()

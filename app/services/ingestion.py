@@ -53,11 +53,21 @@ async def enqueue_conversation_ingest(
     session.add(job)
     await session.commit()
 
-    job_id = await enqueue_process_conversation_via_factory(
-        queue_factory if queue_factory is not None else create_queue,
-        payload.project_id,
-        str(conversation.id),
-    )
+    try:
+        job_id = await enqueue_process_conversation_via_factory(
+            queue_factory if queue_factory is not None else create_queue,
+            payload.project_id,
+            str(conversation.id),
+        )
+    except Exception as exc:
+        job.status = "failed"
+        job.last_error = str(exc)
+        await session.commit()
+        raise
+
+    if job_id is not None:
+        job.arq_job_id = job_id
+        await session.commit()
 
     return ConversationIngestResponse(
         project_id=payload.project_id,

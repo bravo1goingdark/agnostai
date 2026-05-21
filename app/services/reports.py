@@ -1,3 +1,12 @@
+from pathlib import Path
+from typing import TYPE_CHECKING
+
+from app.services.clustering import latest_cluster_run, load_topics
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
+
+
 def render_empty_report(project_id: str) -> str:
     return (
         "# Agnost Insights Report\n\n"
@@ -31,3 +40,39 @@ def render_topic_report(
         if summary:
             lines.append(f"  - {summary}")
     return "\n".join(lines).strip() + "\n"
+
+
+async def render_current_topic_report(
+    session: "AsyncSession",
+    project_id: str,
+) -> str:
+    run = await latest_cluster_run(session, project_id)
+    topics = await load_topics(session, project_id, run.id if run is not None else None)
+    return render_topic_report(
+        project_id,
+        [
+            {
+                "label": topic.label,
+                "member_count": topic.member_count,
+                "summary": topic.summary,
+            }
+            for topic in topics
+        ],
+        cluster_run_id=str(run.id) if run is not None else None,
+    )
+
+
+async def write_current_topic_report(
+    session: "AsyncSession",
+    project_id: str,
+    *,
+    output_dir: Path | str = "reports",
+) -> Path:
+    output_path = Path(output_dir)
+    output_path.mkdir(exist_ok=True)
+    report_file = output_path / f"{project_id}-insights.md"
+    report_file.write_text(
+        await render_current_topic_report(session, project_id),
+        encoding="utf-8",
+    )
+    return report_file

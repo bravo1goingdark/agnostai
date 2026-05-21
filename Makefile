@@ -1,10 +1,16 @@
-.PHONY: install install-ml lint type test check run-api run-worker
+.PHONY: install install-ml migrate demo lint type test check run-api run-worker
 
 install:
 	python -m pip install -e ".[dev]"
 
 install-ml:
 	python -m pip install -e ".[dev,ml]"
+
+migrate:
+	alembic upgrade head
+
+demo:
+	agnost-demo-flow project-1
 
 lint:
 	ruff check .
@@ -22,4 +28,3 @@ run-api:
 
 run-worker:
 	arq app.workers.arq_worker.WorkerSettings
-

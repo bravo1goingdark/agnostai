@@ -22,9 +22,9 @@ class Settings(BaseSettings):
     api_key_header: str = "X-API-Key"
 
     database_url: str = Field(
-        default="postgresql+asyncpg://agnost:agnost@postgres:5432/agnost"
+        default="postgresql+asyncpg://agnost:agnost@localhost:5432/agnost"
     )
-    redis_url: str = Field(default="redis://redis:6379/0")
+    redis_url: str = Field(default="redis://localhost:6379/0")
 
     embedding_model_name: str = "sentence-transformers/all-MiniLM-L6-v2"
     embedding_dimension: int = 384

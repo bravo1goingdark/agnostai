@@ -38,6 +38,7 @@ ml = [
 agnost-seed-sample-data = "app.scripts.seed_sample_data:main"
 agnost-run-clustering = "app.scripts.run_clustering:main"
 agnost-export-report = "app.scripts.export_report:main"
+agnost-demo-flow = "app.scripts.run_demo_flow:main"
 
 [build-system]
 requires = ["hatchling"]

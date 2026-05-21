@@ -126,14 +126,14 @@ async def run_cluster_batch(
             messages, min_cluster_size=params["min_cluster_size"]
         )
         topics = _build_topics(run.id, project_id, clusters, messages)
-        async with session.begin():
-            await _replace_previous_topics(session, project_id)
-            session.add_all(topics)
-            await session.flush()
-            memberships = _build_memberships(topics, clusters, messages)
-            session.add_all(memberships)
-            run.status = "completed"
-            run.completed_at = datetime.now(UTC)
+        await _replace_previous_topics(session, project_id)
+        session.add_all(topics)
+        await session.flush()
+        memberships = _build_memberships(topics, clusters, messages)
+        session.add_all(memberships)
+        run.status = "completed"
+        run.completed_at = datetime.now(UTC)
+        await session.commit()
         return TopicRunResult(cluster_run=run, topics=topics, memberships=memberships)
     except Exception as exc:
         await session.rollback()
@@ -260,6 +260,7 @@ async def _load_cluster_candidates(
         )
         .join(MessageEmbedding, MessageEmbedding.message_id == Message.id)
         .where(Message.project_id == project_id)
+        .where(Message.role == "user")
         .order_by(Message.created_at.asc().nulls_last(), Message.sequence_index.asc())
     )
     if window_start is not None:

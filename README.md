@@ -10,7 +10,9 @@ cp .env.example .env
 python -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
-pytest
+docker compose up -d postgres redis
+alembic upgrade head
+agnost-demo-flow project-1
 ```
 
 For the full topic pipeline:
@@ -51,6 +53,12 @@ Export a report:
 agnost-export-report project-1
 ```
 
+One-command local demo after migrations:
+
+```bash
+agnost-demo-flow project-1
+```
+
 ## API
 
 ```http
@@ -67,6 +75,8 @@ GET /v1/topics/{topic_id}
 - The worker normalizes messages, redacts obvious PII, scores sentiment, and
   stores embeddings.
 - Batch clustering builds topics and memberships from stored messages.
+- `agnost-demo-flow` runs the same ingest, processing, clustering, insights, and
+  report export path inline for a reproducible local review.
 - `REASONING.md` covers the main tradeoffs.
 
 ## Checks
