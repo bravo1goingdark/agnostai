@@ -10,7 +10,7 @@ from app.services.normalization import (
 )
 from app.services.pii import redact_obvious_pii
 from app.services.sentiment import score_sentiment_stub
-from app.workers.jobs import prepare_message_rows
+from app.workers.jobs import _load_existing_embedding_message_ids, prepare_message_rows
 
 
 def test_normalization_and_redaction_helpers() -> None:
@@ -77,3 +77,22 @@ def test_prepare_message_rows_creates_analysis_rows() -> None:
     assert len(rows) == 2
     assert rows[1].content == "Try again. It is broken."
     assert rows[1].role == "user"
+
+
+def test_worker_embedding_id_loader_handles_empty_input() -> None:
+    async def _run() -> set[str]:
+        class _Session:
+            async def execute(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+                raise AssertionError("should not be called")
+
+        result = await _load_existing_embedding_message_ids(
+            _Session(),
+            "project-1",
+            [],
+            "model",
+        )
+        return {str(item) for item in result}
+
+    import asyncio
+
+    assert asyncio.run(_run()) == set()

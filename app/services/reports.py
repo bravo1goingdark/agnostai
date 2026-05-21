@@ -6,10 +6,20 @@ def render_empty_report(project_id: str) -> str:
     )
 
 
-def render_topic_report(project_id: str, topics: list[dict[str, object]]) -> str:
+def render_topic_report(
+    project_id: str,
+    topics: list[dict[str, object]],
+    cluster_run_id: str | None = None,
+) -> str:
     lines = ["# Agnost Insights Report", "", f"Project: {project_id}", ""]
+    if cluster_run_id is not None:
+        lines.extend([f"Latest cluster run: {cluster_run_id}", ""])
     if not topics:
-        lines.append("No cluster run available.")
+        lines.append(
+            "No cluster run available."
+            if cluster_run_id is None
+            else "No topics found in latest cluster run."
+        )
         return "\n".join(lines).strip() + "\n"
 
     lines.append("Top topics:")

@@ -1,10 +1,16 @@
 import logging
 from collections.abc import Sequence
+from datetime import UTC, datetime
 from hashlib import sha256
+from time import perf_counter
 from uuid import UUID
 
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import (
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 
 from app.config import get_settings
 from app.models.tables import Conversation, Message, MessageEmbedding, ProcessingJob
@@ -43,7 +49,10 @@ async def _process_conversation(
     project_id: str,
     conversation_id: str,
 ) -> None:
+    started_at = datetime.now(UTC)
+    started_clock = perf_counter()
     job = await _load_processing_job(session, project_id, conversation_id)
+    next_attempt_count = None
     if job is not None and job.status in {"completed", "processing"}:
         logger.info(
             "process_conversation_skipped project_id=%s conversation_id=%s status=%s",
@@ -54,50 +63,100 @@ async def _process_conversation(
         return
 
     if job is not None:
+        next_attempt_count = (job.attempt_count or 0) + 1
+        job.attempt_count = next_attempt_count
         job.status = "processing"
+        job.started_at = started_at
+        job.last_error = None
     conversation = await _load_conversation(session, project_id, conversation_id)
     if conversation is None:
+        elapsed_ms = int((perf_counter() - started_clock) * 1000)
         logger.warning(
             "process_conversation_missing_conversation "
             "project_id=%s conversation_id=%s",
             project_id,
             conversation_id,
         )
+        if job is not None:
+            job.status = "failed"
+            job.last_error = "conversation not found"
+            job.completed_at = datetime.now(UTC)
+            await session.commit()
+        logger.info(
+            "process_conversation_missing_complete "
+            "project_id=%s conversation_id=%s duration_ms=%s",
+            project_id,
+            conversation_id,
+            elapsed_ms,
+        )
         return
-    await _materialize_messages(session, conversation)
-    derived_messages = await _load_messages(session, project_id, conversation_id)
-    metadata = embedding_metadata()
-
-    for message in derived_messages:
-        normalized = normalize_message_text(message.content)
-        cleaned = redact_obvious_pii(normalized)
-        sentiment_score, sentiment_label = score_sentiment_stub(cleaned)
-        message.content = cleaned
-        message.normalized_text_hash = sha256(cleaned.encode("utf-8")).hexdigest()
-        if is_user_message(message.role):
-            message.sentiment_score = sentiment_score
-            message.sentiment_label = sentiment_label
-        session.add(
-            MessageEmbedding(
-                project_id=project_id,
-                message_id=message.id,
-                model_name=str(metadata["model_name"]),
-                dimension=metadata["dimension"],
-                embedding=embed_text_stub(cleaned, metadata["dimension"]),
-            )
+    try:
+        await _materialize_messages(session, conversation)
+        derived_messages = await _load_messages(session, project_id, conversation_id)
+        metadata = embedding_metadata()
+        existing_embeddings = await _load_existing_embedding_message_ids(
+            session,
+            project_id,
+            [message.id for message in derived_messages],
+            str(metadata["model_name"]),
         )
 
-    if job is not None:
-        job.status = "completed"
+        for message in derived_messages:
+            normalized = normalize_message_text(message.content)
+            cleaned = redact_obvious_pii(normalized)
+            sentiment_score, sentiment_label = score_sentiment_stub(cleaned)
+            message.content = cleaned
+            message.normalized_text_hash = sha256(cleaned.encode("utf-8")).hexdigest()
+            if is_user_message(message.role):
+                message.sentiment_score = sentiment_score
+                message.sentiment_label = sentiment_label
+            if message.id in existing_embeddings:
+                continue
+            session.add(
+                MessageEmbedding(
+                    project_id=project_id,
+                    message_id=message.id,
+                    model_name=str(metadata["model_name"]),
+                    dimension=metadata["dimension"],
+                    embedding=embed_text_stub(cleaned, metadata["dimension"]),
+                )
+            )
 
-    await session.commit()
-    logger.info(
-        "process_conversation_complete "
-        "project_id=%s conversation_id=%s message_count=%s",
-        project_id,
-        conversation_id,
-        len(derived_messages),
-    )
+        if job is not None:
+            job.status = "completed"
+            job.completed_at = datetime.now(UTC)
+
+        await session.commit()
+        elapsed_ms = int((perf_counter() - started_clock) * 1000)
+        logger.info(
+            "process_conversation_complete "
+            "project_id=%s conversation_id=%s message_count=%s duration_ms=%s",
+            project_id,
+            conversation_id,
+            len(derived_messages),
+            elapsed_ms,
+        )
+    except Exception as exc:
+        await session.rollback()
+        if job is not None:
+            failed_job = await session.get(ProcessingJob, job.id)
+            if failed_job is not None:
+                failed_job.attempt_count = failed_job.attempt_count
+                if next_attempt_count is not None:
+                    failed_job.attempt_count = next_attempt_count
+                failed_job.status = "failed"
+                failed_job.last_error = str(exc)
+                failed_job.completed_at = datetime.now(UTC)
+                await session.commit()
+        elapsed_ms = int((perf_counter() - started_clock) * 1000)
+        logger.exception(
+            "process_conversation_failed "
+            "project_id=%s conversation_id=%s duration_ms=%s",
+            project_id,
+            conversation_id,
+            elapsed_ms,
+        )
+        raise
 
 
 async def _load_processing_job(
@@ -125,6 +184,23 @@ async def _load_messages(
         .order_by(Message.sequence_index.asc())
     )
     return list(result.scalars().all())
+
+
+async def _load_existing_embedding_message_ids(
+    session: AsyncSession,
+    project_id: str,
+    message_ids: list[UUID],
+    model_name: str,
+) -> set[UUID]:
+    if not message_ids:
+        return set()
+    result = await session.execute(
+        select(MessageEmbedding.message_id)
+        .where(MessageEmbedding.project_id == project_id)
+        .where(MessageEmbedding.model_name == model_name)
+        .where(MessageEmbedding.message_id.in_(message_ids))
+    )
+    return set(result.scalars().all())
 
 
 async def _load_conversation(

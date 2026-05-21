@@ -7,6 +7,7 @@ from pathlib import Path
 from app.db import SessionLocal
 from app.models.tables import Project
 from app.services.clustering import latest_cluster_run, load_topics
+from app.services.reports import render_topic_report
 
 
 async def _export(project_id: str) -> str:
@@ -18,17 +19,18 @@ async def _export(project_id: str) -> str:
         topics = await load_topics(
             session, project_id, run.id if run is not None else None
         )
-        lines = ["# Agnost Insights Report", "", f"Project: {project_id}", ""]
-        if run is None:
-            lines.append("No cluster run available.")
-        else:
-            lines.append(f"Latest cluster run: {run.id}")
-            lines.append("")
-            for topic in topics:
-                lines.append(f"- {topic.label} ({topic.member_count} messages)")
-                if topic.summary:
-                    lines.append(f"  - {topic.summary}")
-        report = "\n".join(lines).strip() + "\n"
+        report = render_topic_report(
+            project_id,
+            [
+                {
+                    "label": topic.label,
+                    "member_count": topic.member_count,
+                    "summary": topic.summary,
+                }
+                for topic in topics
+            ],
+            cluster_run_id=str(run.id) if run is not None else None,
+        )
         output_path = Path("reports")
         output_path.mkdir(exist_ok=True)
         report_file = output_path / f"{project_id}-insights.md"
