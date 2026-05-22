@@ -5,22 +5,30 @@ requests, complaints, and blockers into queryable product insights.
 
 ## Quickstart
 
-> **Warning**
-> The first build downloads sentence-transformers, HDBSCAN, FAISS, and VADER
-> (~2 GB). Subsequent runs use the cached image and start in seconds.
-
 ```bash
 cp .env.example .env
 docker compose up --build -d && docker compose run --rm demo
 ```
 
 That's it. Open **http://localhost:8000** — the dashboard loads with seeded
-sample data, clustered topics, and live insights.
+sample data, clustered topics, and live insights (deterministic stubs, ~200 MB).
+
+For the full ML pipeline (real embeddings, VADER sentiment, HDBSCAN clustering, FAISS):
+
+```bash
+docker compose build --build-arg PACKAGE_EXTRAS="[dev,ml]" && docker compose up -d && docker compose run --rm demo
+```
+
+> **Warning**
+> The full ML build downloads sentence-transformers, torch, HDBSCAN, and FAISS
+> (~2 GB). Cached builds start in seconds. The stub path uses deterministic
+> fallbacks — same dashboard, lighter footprint.
 
 If you have `make`:
 
 ```bash
-make demo
+make demo          # stubs (~200 MB)
+make demo-full     # full ML pipeline (~2 GB first build)
 ```
 
 ## Checks

@@ -1,4 +1,4 @@
-.PHONY: install install-ml migrate demo lint type test check run-api run-worker up
+.PHONY: install install-ml migrate demo demo-full lint type test check run-api run-worker up
 
 install:
 	python -m pip install -e ".[dev]"
@@ -11,6 +11,9 @@ migrate:
 
 demo:
 	docker compose up --build -d && docker compose run --rm demo && echo && echo "Dashboard: http://localhost:8000"
+
+demo-full:
+	docker compose build --build-arg PACKAGE_EXTRAS="[dev,ml]" && docker compose up -d && docker compose run --rm demo && echo && echo "Dashboard: http://localhost:8000"
 
 lint:
 	ruff check .
