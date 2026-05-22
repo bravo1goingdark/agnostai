@@ -208,9 +208,12 @@ erDiagram
 A single database holds raw payloads, derived messages, embedding vectors, topic
 assignments, and cluster run metadata. No separate vector store — pgvector indexes
 the embeddings in the same transactions as the application data, which keeps
-recomputation and inspection straightforward. The schema uses
-`Vector(384).with_variant(JSON(), "sqlite")` so integration tests run against
-in-memory SQLite while production uses pgvector's IVFFlat index.
+recomputation and inspection straightforward.
+
+**Rejected:** Dedicated vector DBs (Pinecone, Weaviate, Milvus) add operational
+overhead without benefit at demo scale. SQLite-only would skip pgvector's IVFFlat
+index. The schema uses `Vector(384).with_variant(JSON(), "sqlite")` so integration
+tests run against in-memory SQLite while production uses PostgreSQL.
 
 ### ARQ for background work
 
@@ -221,6 +224,11 @@ are generated via sentence-transformers/all-MiniLM-L6-v2. Processing jobs track
 attempt count, status, timing, and last error. After 3 failed attempts the job is
 skipped permanently.
 
+**Rejected:** Celery (too heavy for a demo — broker config, result backends,
+flower monitoring). Dramatiq (similar weight to ARQ but less Redis-native).
+BackgroundTasks/FastAPI's built-in (no persistence, no retry). ARQ is ~200 lines of
+Redis-backed reliability with zero ceremony.
+
 ### HDBSCAN with deterministic fallback
 
 HDBSCAN is the primary clustering algorithm because topic counts are unknown and
@@ -230,15 +238,23 @@ dependencies required. When numpy and HDBSCAN are available, embeddings are load
 as float32 arrays and clustered with `min_cluster_size` from configuration. c-TF-IDF
 labels topics from the most frequent cluster terms.
 
+**Rejected:** K-means (requires pre-specifying K — impossible for unknown topic
+counts). LDA (weaker on short conversational text; needs document-length context).
+Agglomerative clustering (O(n²) memory, no native noise handling). The HDBSCAN +
+c-TF-IDF combo needs no hyperparameter tuning and naturally separates signal from
+noise.
+
 ### FAISS spatial index (optional)
 
 When faiss-cpu is installed alongside numpy, `_build_memberships` normalizes all
 query embeddings and cluster centroids to unit vectors, builds a `faiss.IndexFlatIP`
 (inner product = cosine similarity for normalized vectors), and batch-searches all
-message-centroid pairs. Without FAISS, similarity is computed per-message via
-explicit cosine distance — correct but O(n·k·d). The FAISS path drops the constant
-factor significantly, trading a small import-time dependency for near-instant
-membership assignment at any scale.
+message-centroid pairs in one GPU/CPU-optimized call. Without FAISS, similarity is
+computed per-message via explicit cosine distance — correct but O(n·k·d).
+
+**Rejected:** scikit-learn's `cosine_similarity` (same O(n·k·d) as the manual
+loop, no index acceleration). Annoy/NMSLIB (require building a persistent index;
+FAISS in-memory is simpler for batch jobs that rebuild clusters each run).
 
 ### Real embeddings and sentiment
 
@@ -247,7 +263,12 @@ When the ML extras are not installed, the system falls back to a deterministic
 character-sum hash that preserves text identity (identical texts produce identical
 vectors). Sentiment uses VADER's compound score with ±0.05 thresholds for
 positive/negative classification; the keyword-based stub is preserved as a
-fallback. Both modules follow the same pattern: try the real model, silently
+fallback.
+
+**Rejected:** OpenAI embeddings API (network latency, cost per call, no offline
+demo). Larger sentence-transformers like `all-mpnet-base-v2` (2x memory, marginal
+gain on short text). TextBlob for sentiment (slower, same lexicon-based approach
+as VADER). Both modules follow the same pattern: try the real model, silently
 degrade to the stub if unavailable.
 
 ### Raw / derived separation
