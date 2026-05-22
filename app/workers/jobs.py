@@ -14,18 +14,20 @@ from sqlalchemy.ext.asyncio import (
 
 from app.config import get_settings
 from app.models.tables import Conversation, Message, MessageEmbedding, ProcessingJob
-from app.services.embeddings import embed_text_stub, embedding_metadata
+from app.services.embeddings import embed_text, embedding_metadata
 from app.services.normalization import (
     analysis_text_for_message,
     normalize_message_text,
     parse_conversation_messages,
 )
 from app.services.pii import redact_obvious_pii
-from app.services.sentiment import is_user_message, score_sentiment_stub
+from app.services.sentiment import is_user_message, score_sentiment
 
 logger = logging.getLogger(__name__)
 
 _settings = get_settings()
+# Engine created at module level for simplicity — if the database is unavailable
+# at import time, the worker will crash. In production, move to a lazy factory.
 _engine = create_async_engine(_settings.database_url, pool_pre_ping=True)
 SessionLocal = async_sessionmaker(_engine, expire_on_commit=False)
 
@@ -53,12 +55,23 @@ async def _process_conversation(
     started_clock = perf_counter()
     job = await _load_processing_job(session, project_id, conversation_id)
     next_attempt_count = None
+    settings = get_settings()
     if job is not None and job.status in {"completed", "processing"}:
         logger.info(
             "process_conversation_skipped project_id=%s conversation_id=%s status=%s",
             project_id,
             conversation_id,
             job.status,
+        )
+        return
+
+    if job is not None and job.attempt_count >= settings.worker_max_retries:
+        logger.info(
+            "process_conversation_max_retries "
+            "project_id=%s conversation_id=%s attempt_count=%s",
+            project_id,
+            conversation_id,
+            job.attempt_count,
         )
         return
 
@@ -104,7 +117,7 @@ async def _process_conversation(
         for message in derived_messages:
             normalized = normalize_message_text(message.content)
             cleaned = redact_obvious_pii(normalized)
-            sentiment_score, sentiment_label = score_sentiment_stub(cleaned)
+            sentiment_score, sentiment_label = score_sentiment(cleaned)
             message.content = cleaned
             message.normalized_text_hash = sha256(cleaned.encode("utf-8")).hexdigest()
             if is_user_message(message.role):
@@ -118,7 +131,7 @@ async def _process_conversation(
                     message_id=message.id,
                     model_name=str(metadata["model_name"]),
                     dimension=metadata["dimension"],
-                    embedding=embed_text_stub(cleaned, metadata["dimension"]),
+                    embedding=embed_text(cleaned, metadata["dimension"]),
                 )
             )
 
@@ -141,7 +154,6 @@ async def _process_conversation(
         if job is not None:
             failed_job = await session.get(ProcessingJob, job.id)
             if failed_job is not None:
-                failed_job.attempt_count = failed_job.attempt_count
                 if next_attempt_count is not None:
                     failed_job.attempt_count = next_attempt_count
                 failed_job.status = "failed"
@@ -228,38 +240,17 @@ async def _materialize_messages(
     if existing:
         return list(existing)
 
-    messages = parse_conversation_messages(conversation.raw_payload)
-    previous_assistant_context: str | None = None
-    materialized: list[Message] = []
-    for index, raw_message in enumerate(messages):
-        analysis_text = analysis_text_for_message(
-            raw_message,
-            previous_assistant_context,
-        )
-        normalized = normalize_message_text(analysis_text)
-        cleaned = redact_obvious_pii(normalized)
-        materialized.append(
-            Message(
-                project_id=conversation.project_id,
-                conversation_id=conversation.id,
-                external_id=raw_message.message_id,
-                sequence_index=index,
-                role=raw_message.role,
-                content=cleaned,
-                normalized_text_hash=sha256(cleaned.encode("utf-8")).hexdigest(),
-                created_at=raw_message.created_at,
-                metadata_=raw_message.metadata,
-            )
-        )
-        if raw_message.role == "assistant":
-            previous_assistant_context = cleaned
-
-    session.add_all(materialized)
+    rows = _build_message_rows(conversation)
+    session.add_all(rows)
     await session.flush()
-    return materialized
+    return rows
 
 
 def prepare_message_rows(conversation: Conversation) -> list[Message]:
+    return _build_message_rows(conversation)
+
+
+def _build_message_rows(conversation: Conversation) -> list[Message]:
     messages = parse_conversation_messages(conversation.raw_payload)
     previous_assistant_context: str | None = None
     rows: list[Message] = []

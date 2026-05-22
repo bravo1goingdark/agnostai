@@ -227,18 +227,50 @@ async def compute_insights(
     )
     total_messages = int(total_messages_result.scalar_one() or 0)
 
+    representative_texts = await _representative_texts_for_topics(
+        session, [topic.id for topic in topics]
+    )
+
     return {
         "project_id": project_id,
         "latest_cluster_run_id": str(run.id) if run is not None else None,
         "generated_at": datetime.now(UTC),
         "total_messages": total_messages,
         "total_topics": len(topics),
-        "top_topics": [topic_to_summary(topic) for topic in topics[:5]],
+        "top_topics": [
+            topic_to_summary(topic, representative_texts=representative_texts)
+            for topic in topics[:5]
+        ],
         "sentiment_distribution": sentiment_distribution,
         "emerging_topics": [
-            topic_to_summary(topic) for topic in topics if (topic.growth_24h or 0) > 0
+            topic_to_summary(
+                topic, representative_texts=representative_texts
+            )
+            for topic in topics
+            if (topic.growth_24h or 0) > 0
         ][:5],
     }
+
+
+async def _representative_texts_for_topics(
+    session: AsyncSession,
+    topic_ids: list[UUID],
+) -> dict[UUID, list[str]]:
+    if not topic_ids:
+        return {}
+
+    rows = await session.execute(
+        select(TopicMembership.topic_id, Message.content)
+        .join(Message, Message.id == TopicMembership.message_id)
+        .where(TopicMembership.topic_id.in_(topic_ids))
+        .where(TopicMembership.is_representative == True)  # noqa: E712
+        .order_by(TopicMembership.created_at.asc())
+    )
+
+    result: dict[UUID, list[str]] = {}
+    for topic_id, content in rows.all():
+        result.setdefault(topic_id, []).append(content)
+    return result
 
 
 async def _load_cluster_candidates(
@@ -591,19 +623,25 @@ def _max_datetime(values: list[datetime | None]) -> datetime | None:
 def _growth_rate(messages: list[dict[str, Any]], *, hours: int) -> float | None:
     if len(messages) < 2:
         return None
-    cutoff = datetime.now(UTC) - timedelta(hours=hours)
-    recent = 0
-    older = 0
-    for message in messages:
-        created_at = _ensure_aware_datetime(message.get("created_at"))
-        if created_at is None or created_at < cutoff:
-            continue
-        if created_at >= cutoff + timedelta(hours=hours / 2):
-            recent += 1
-        else:
-            older += 1
+    now = datetime.now(UTC)
+    recent_cutoff = now - timedelta(hours=hours)
+    older_cutoff = now - timedelta(hours=hours * 2)
+
+    recent = sum(
+        1
+        for message in messages
+        if (created_at := _ensure_aware_datetime(message.get("created_at")))
+        and created_at >= recent_cutoff
+    )
+    older = sum(
+        1
+        for message in messages
+        if (created_at := _ensure_aware_datetime(message.get("created_at")))
+        and older_cutoff <= created_at < recent_cutoff
+    )
+
     if older == 0:
-        return float(recent) if recent else None
+        return None
     return (recent - older) / older
 
 
@@ -642,8 +680,17 @@ def _vector_norm(vector: list[float]) -> float:
     return sqrt(sum(value * value for value in vector))
 
 
-def topic_to_summary(topic: Topic) -> dict[str, Any]:
-    representative_examples = list(topic.terms or [])[:3]
+def topic_to_summary(
+    topic: Topic,
+    *,
+    representative_texts: dict[UUID, list[str]] | None = None,
+) -> dict[str, Any]:
+    if representative_texts and topic.id in representative_texts:
+        examples = [
+            text[:160] for text in representative_texts[topic.id][:3]
+        ]
+    else:
+        examples = list(topic.terms or [])[:3]
     return {
         "id": str(topic.id),
         "cluster_run_id": str(topic.cluster_run_id),
@@ -658,5 +705,5 @@ def topic_to_summary(topic: Topic) -> dict[str, Any]:
         "negative_sentiment_share": topic.negative_sentiment_share,
         "first_seen_at": topic.first_seen_at,
         "last_seen_at": topic.last_seen_at,
-        "representative_examples": representative_examples,
+        "representative_examples": examples,
     }

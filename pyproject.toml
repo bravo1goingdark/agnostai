@@ -16,6 +16,7 @@ dependencies = [
     "redis>=5.0.8",
     "sqlalchemy[asyncio]>=2.0.34",
     "uvicorn[standard]>=0.30.6,<1.0.0",
+    "vaderSentiment>=3.3.2",
 ]
 
 [project.optional-dependencies]
@@ -39,6 +40,7 @@ agnost-seed-sample-data = "app.scripts.seed_sample_data:main"
 agnost-run-clustering = "app.scripts.run_clustering:main"
 agnost-export-report = "app.scripts.export_report:main"
 agnost-demo-flow = "app.scripts.run_demo_flow:main"
+agnost-recompute = "app.scripts.recompute:main"
 
 [build-system]
 requires = ["hatchling"]
@@ -65,3 +67,10 @@ strict = true
 warn_unused_ignores = true
 warn_return_any = true
 files = ["app"]
+
+[[tool.mypy.overrides]]
+module = [
+    "sentence_transformers.*",
+    "vaderSentiment.*",
+]
+ignore_missing_imports = true
