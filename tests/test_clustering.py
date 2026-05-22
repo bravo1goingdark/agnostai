@@ -3,8 +3,17 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
-from app.models.tables import Topic
-from app.services.clustering import _cluster_messages, topic_to_summary
+import pytest
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
+from app.models.tables import ClusterRun, Topic
+from app.services.clustering import (
+    _cluster_messages,
+    _growth_rate,
+    run_cluster_batch,
+    topic_to_summary,
+)
 
 
 def test_cluster_messages_groups_repeated_terms() -> None:
@@ -75,3 +84,76 @@ def test_topic_to_summary_serializes_public_contract() -> None:
     assert summary["cluster_run_id"] == str(cluster_run_id)
     assert summary["label"] == "api / setup / onboarding"
     assert summary["representative_examples"] == ["api", "setup", "onboarding"]
+
+
+def test_growth_rate_consecutive_equal_windows() -> None:
+    now = datetime.now(UTC)
+    messages = [
+        {"created_at": now - timedelta(hours=4)},
+        {"created_at": now - timedelta(hours=12)},
+        {"created_at": now - timedelta(hours=28)},
+        {"created_at": now - timedelta(hours=36)},
+    ]
+    rate = _growth_rate(messages, hours=24)
+    assert rate is not None
+    assert rate == 0.0
+
+
+def test_growth_rate_growing_topic() -> None:
+    now = datetime.now(UTC)
+    messages = [
+        {"created_at": now - timedelta(hours=1)},
+        {"created_at": now - timedelta(hours=3)},
+        {"created_at": now - timedelta(hours=6)},
+        {"created_at": now - timedelta(hours=25)},
+    ]
+    rate = _growth_rate(messages, hours=24)
+    assert rate is not None
+    assert rate == 2.0
+
+
+def test_growth_rate_returns_none_when_no_older_window() -> None:
+    now = datetime.now(UTC)
+    messages = [
+        {"created_at": now - timedelta(hours=1)},
+        {"created_at": now - timedelta(hours=5)},
+    ]
+    rate = _growth_rate(messages, hours=24)
+    assert rate is None
+
+
+def test_growth_rate_returns_none_for_single_message() -> None:
+    messages = [{"created_at": datetime.now(UTC)}]
+    rate = _growth_rate(messages, hours=24)
+    assert rate is None
+
+
+@pytest.mark.asyncio
+async def test_run_cluster_batch_failure_marks_run_as_failed(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    from unittest.mock import patch
+
+    async with session_factory() as session:
+        with patch(
+            "app.services.clustering._cluster_messages",
+            side_effect=ValueError("simulated failure"),
+        ):
+            with pytest.raises(ValueError, match="simulated failure"):
+                await run_cluster_batch(
+                    session,
+                    "project-1",
+                )
+
+    async with session_factory() as session:
+        runs = (
+            await session.execute(
+                select(ClusterRun)
+                .where(ClusterRun.project_id == "project-1")
+                .order_by(ClusterRun.created_at.desc())
+            )
+        ).scalars().all()
+
+    assert len(runs) >= 1
+    assert runs[0].status == "failed"
+    assert "simulated failure" in (runs[0].error_message or "")

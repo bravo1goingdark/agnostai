@@ -1,55 +1,18 @@
-import sqlite3
-
 import pytest
-import pytest_asyncio
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from sqlalchemy.pool import StaticPool
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.db import Base
 from app.models.schemas import ConversationIngestRequest
 from app.models.tables import Conversation, ProcessingJob, Project
 from app.services.ingestion import (
     conversation_content_hash,
     enqueue_conversation_ingest,
 )
-
-
-class FakeJob:
-    job_id = "queued-job-1"
-
-
-class FakeRedis:
-    async def enqueue_job(self, *args: object, **kwargs: object) -> FakeJob:
-        return FakeJob()
-
-    async def aclose(self) -> None:
-        return None
+from tests.conftest import FakeRedis
 
 
 async def fake_queue_factory() -> FakeRedis:
     return FakeRedis()
-
-
-@pytest_asyncio.fixture
-async def session_factory():
-    engine = create_async_engine(
-        "sqlite+aiosqlite://",
-        creator=lambda: sqlite3.connect(  # noqa: E731
-            ":memory:",
-            check_same_thread=False,
-        ),
-        poolclass=StaticPool,
-    )
-    async with engine.begin() as connection:
-        await connection.run_sync(
-            Base.metadata.create_all,
-            tables=[Project.__table__, Conversation.__table__, ProcessingJob.__table__],
-        )
-    try:
-        yield async_sessionmaker(engine, expire_on_commit=False)
-    finally:
-        await engine.dispose()
 
 
 def sample_payload(conversation_id: str = "conv-1") -> ConversationIngestRequest:
