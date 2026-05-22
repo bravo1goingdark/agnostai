@@ -60,6 +60,9 @@ async def write_current_topic_report(
     *,
     output_dir: Path | str = "reports",
 ) -> Path:
+    import os
+
+    output_dir = os.environ.get("REPORT_DIR", str(output_dir))
     output_path = Path(output_dir)
     output_path.mkdir(exist_ok=True)
     report_file = output_path / f"{project_id}-insights.md"

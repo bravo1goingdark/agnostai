@@ -19,6 +19,7 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://agnost:agnost@postgres:5432/agnost
       REDIS_URL: redis://redis:6379/0
+      REPORT_DIR: /tmp/reports
     ports:
       - "8000:8000"
     volumes:
@@ -39,6 +40,7 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://agnost:agnost@postgres:5432/agnost
       REDIS_URL: redis://redis:6379/0
+      REPORT_DIR: /tmp/reports
     volumes:
       - .:/app
     depends_on:
