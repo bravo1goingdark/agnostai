@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     embedding_model_name: str = "sentence-transformers/all-MiniLM-L6-v2"
     embedding_dimension: int = 384
     worker_job_timeout_seconds: int = 600
+    worker_max_retries: int = 3
     clustering_min_cluster_size: int = 5
 
     @computed_field  # type: ignore[prop-decorator]
