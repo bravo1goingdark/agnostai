@@ -41,5 +41,7 @@ async def bootstrap_demo(
         report_path=str(report_path),
         report_text=report_path.read_text(encoding="utf-8"),
         insights=insights,
-        topics=[topic_to_summary(topic) for topic in topics],
+        topics=[
+            topic_to_summary(topic) for topic in topics
+        ],
     )

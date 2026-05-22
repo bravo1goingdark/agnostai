@@ -7,7 +7,7 @@ MessageRole = Literal["user", "assistant", "system", "tool"]
 
 
 class ConversationMessage(BaseModel):
-    model_config = ConfigDict(extra="allow")
+    model_config = ConfigDict(extra="forbid")
 
     message_id: str | None = None
     role: MessageRole
@@ -65,6 +65,7 @@ class TopicDetailResponse(TopicSummary):
     project_id: str
     source_conversation_ids: list[str] = Field(default_factory=list)
     messages: list[TopicMessageExample] = Field(default_factory=list)
+    prior_cluster_runs: list[str] = Field(default_factory=list)
 
 
 class TopicListResponse(BaseModel):

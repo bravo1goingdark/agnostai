@@ -2,6 +2,7 @@ from typing import cast
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_session
@@ -12,6 +13,7 @@ from app.models.schemas import (
     TopicMessageExample,
     TopicSummary,
 )
+from app.models.tables import ClusterRun, Topic
 from app.services.clustering import (
     latest_cluster_run,
     load_topic_detail,
@@ -59,9 +61,22 @@ async def get_topic(
     representative_examples = [message.content for message in messages[:3]]
     topic_data = topic_to_summary(topic)
     topic_data.pop("representative_examples", None)
+
+    prior_runs_result = await session.execute(
+        select(ClusterRun.id)
+        .join(Topic, Topic.cluster_run_id == ClusterRun.id)
+        .where(Topic.project_id == topic.project_id)
+        .where(Topic.cluster_label == topic.cluster_label)
+        .where(ClusterRun.id != topic.cluster_run_id)
+        .order_by(ClusterRun.created_at.desc())
+        .limit(5)
+    )
+    prior_cluster_runs = [str(run_id) for (run_id,) in prior_runs_result.all()]
+
     return TopicDetailResponse(
         project_id=topic.project_id,
         source_conversation_ids=[str(message.conversation_id) for message in messages],
+        prior_cluster_runs=prior_cluster_runs,
         messages=[
             TopicMessageExample(
                 message_id=str(message.id),

@@ -36,6 +36,9 @@ def create_engine() -> AsyncEngine:
     )
 
 
+# Engine created at module level for simplicity — if the database is unavailable
+# at import time, the FastAPI process will crash before serving a health check.
+# In production, move to a lazy factory or FastAPI lifespan hook.
 engine = create_engine()
 SessionLocal = async_sessionmaker(engine, expire_on_commit=False)
 
