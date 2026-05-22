@@ -28,27 +28,35 @@ def sample_payloads(
     themes = [
         (
             "setup",
-            "Setup API key onboarding is blocked because the setup "
-            "wizard keeps failing.",
-            "Ask for the exact setup error and confirm the API key scopes.",
+            [
+                "Setup wizard keeps failing on the API key step and onboarding stalls.",
+                "Onboarding flow rejects our API key during initial workspace setup.",
+                "API key validation errors stop the setup wizard from completing.",
+            ],
+            "Ask for the exact onboarding error and confirm the API key scopes.",
         ),
         (
             "billing",
-            "Billing invoice sync is broken after upgrade and the finance "
-            "team is blocked.",
-            "Escalate the invoice sync failure and capture the affected "
-            "billing account.",
+            [
+                "Billing invoice sync stopped working after the plan upgrade.",
+                "Finance team cannot reconcile invoices since billing sync broke.",
+                "Invoice totals mismatch after upgrade and billing reports are wrong.",
+            ],
+            "Escalate the invoice sync failure and capture the billing account id.",
         ),
         (
             "report",
-            "Report export CSV is missing from the dashboard and product "
-            "review is blocked.",
+            [
+                "Report export to CSV is missing from the dashboard download menu.",
+                "Dashboard CSV export button does nothing for weekly product review.",
+                "Cannot export topic reports to CSV from the analytics dashboard.",
+            ],
             "Confirm the report export filters and share the dashboard workspace.",
         ),
     ]
     payloads: list[ConversationIngestRequest] = []
-    for theme_index, (theme, user_template, assistant_template) in enumerate(themes):
-        for item_index in range(3):
+    for theme_index, (theme, user_messages, assistant_template) in enumerate(themes):
+        for item_index, user_message in enumerate(user_messages):
             created_at = base_time - timedelta(hours=(theme_index * 8) + item_index)
             payloads.append(
                 ConversationIngestRequest(
@@ -57,10 +65,7 @@ def sample_payloads(
                     messages=[
                         {
                             "role": "user",
-                            "content": (
-                                f"{user_template} Case {item_index + 1} "
-                                "needs help today."
-                            ),
+                            "content": user_message,
                             "created_at": created_at,
                             "metadata": {"sample_theme": theme},
                         },
@@ -97,7 +102,7 @@ async def seed_sample_conversations(
         if response.stored_conversation_id is None:
             continue
         result.stored_conversation_ids.append(response.stored_conversation_id)
-        if process_inline:
+        if response.status == "accepted" and process_inline:
             await process_conversation(
                 {"session": session},
                 project_id,

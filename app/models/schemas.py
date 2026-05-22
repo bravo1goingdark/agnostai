@@ -82,3 +82,26 @@ class InsightsResponse(BaseModel):
     top_topics: list[TopicSummary] = Field(default_factory=list)
     sentiment_distribution: dict[str, float | int] = Field(default_factory=dict)
     emerging_topics: list[TopicSummary] = Field(default_factory=list)
+
+
+class ReportResponse(BaseModel):
+    project_id: str
+    latest_cluster_run_id: str | None = None
+    report_text: str
+
+
+class DemoBootstrapRequest(BaseModel):
+    project_id: str = Field(min_length=1, max_length=128)
+
+
+class DemoBootstrapResponse(BaseModel):
+    project_id: str
+    accepted: int
+    duplicate: int
+    processed: int
+    topic_count: int
+    latest_cluster_run_id: str | None = None
+    report_path: str
+    report_text: str
+    insights: InsightsResponse
+    topics: list[TopicSummary] = Field(default_factory=list)

@@ -11,6 +11,7 @@ RUN groupadd --system agnost \
 
 COPY pyproject.toml README.md ./
 COPY app ./app
+COPY frontend ./frontend
 COPY alembic.ini ./
 COPY alembic ./alembic
 

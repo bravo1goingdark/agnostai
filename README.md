@@ -11,8 +11,7 @@ python -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
 docker compose up -d postgres redis
-alembic upgrade head
-agnost-demo-flow project-1
+docker compose up
 ```
 
 For the full topic pipeline:
@@ -35,11 +34,9 @@ Worker:
 arq app.workers.arq_worker.WorkerSettings
 ```
 
-Seed sample data:
+The UI is available at `http://localhost:8000/`.
 
-```bash
-agnost-seed-sample-data project-1
-```
+Use the `Bootstrap sample` action in the dashboard to load the sample project.
 
 Run clustering:
 
@@ -75,8 +72,8 @@ GET /v1/topics/{topic_id}
 - The worker normalizes messages, redacts obvious PII, scores sentiment, and
   stores embeddings.
 - Batch clustering builds topics and memberships from stored messages.
-- `agnost-demo-flow` runs the same ingest, processing, clustering, insights, and
-  report export path inline for a reproducible local review.
+- The dashboard at `/` is served by the API container and reads the same
+  `/v1/*` endpoints.
 - `REASONING.md` covers the main tradeoffs.
 
 ## Checks

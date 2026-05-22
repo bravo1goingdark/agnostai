@@ -347,13 +347,20 @@ def _fallback_labels(
         message_tokens.append(tokens)
         token_counts.update(set(tokens))
 
+    total = len(messages)
+    df_ceiling = max(2, int(total * 0.6)) if total >= 4 else total
+
     buckets: dict[tuple[str, ...], int] = {}
     labels: list[int] = []
     next_label = 0
     signature_size = max(1, min_cluster_size // 2 or 1)
     for tokens in message_tokens:
         ranked = sorted(
-            [token for token in tokens if token_counts[token] >= 2],
+            [
+                token
+                for token in tokens
+                if 2 <= token_counts[token] <= df_ceiling
+            ],
             key=lambda token: (-token_counts[token], token),
         )
         if not ranked:

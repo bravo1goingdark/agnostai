@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Agnost</title>
+    <meta name="theme-color" content="#010102">
+    <link rel="stylesheet" href="/assets/styles.css">
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand">
+          <div class="brand-mark">A</div>
+          <div>
+            <div class="eyebrow">Conversation intelligence</div>
+            <h1>Agnost</h1>
+          </div>
+        </div>
+        <div class="topbar-actions">
+          <button class="button secondary" id="refresh-button" type="button">
+            <span class="icon" aria-hidden="true">↻</span>
+            Refresh
+          </button>
+          <button class="button primary" id="bootstrap-button" type="button">
+            <span class="icon" aria-hidden="true">⚡</span>
+            Bootstrap sample
+          </button>
+        </div>
+      </header>
+
+      <main class="layout">
+        <aside class="sidebar panel">
+          <section class="stack">
+            <div class="section-head">
+              <div>
+                <div class="eyebrow">Configuration</div>
+                <h2>Runtime controls</h2>
+              </div>
+              <span class="status-pill" id="connection-status">idle</span>
+            </div>
+
+            <label class="field">
+              <span>API base URL</span>
+              <input id="api-base-url" type="text" spellcheck="false">
+            </label>
+
+            <label class="field">
+              <span>Project ID</span>
+              <input id="project-id" type="text" spellcheck="false">
+            </label>
+
+            <div class="field-row">
+              <label class="field">
+                <span>Refresh interval</span>
+                <input id="refresh-interval" type="number" min="0" step="5">
+              </label>
+              <label class="toggle">
+                <input id="auto-refresh" type="checkbox">
+                <span>Auto refresh</span>
+              </label>
+            </div>
+
+            <label class="toggle">
+              <input id="dense-mode" type="checkbox">
+              <span>Dense layout</span>
+            </label>
+
+            <div class="divider"></div>
+
+            <div class="metric">
+              <span class="metric-label">Latest run</span>
+              <strong id="latest-run">none</strong>
+            </div>
+            <div class="metric">
+              <span class="metric-label">Messages</span>
+              <strong id="total-messages">0</strong>
+            </div>
+            <div class="metric">
+              <span class="metric-label">Topics</span>
+              <strong id="total-topics">0</strong>
+            </div>
+          </section>
+        </aside>
+
+        <section class="content">
+          <section class="panel">
+            <div class="section-head">
+              <div>
+                <div class="eyebrow">Insights</div>
+                <h2>Project overview</h2>
+              </div>
+              <div class="subtitle" id="generated-at">Waiting for data</div>
+            </div>
+            <div class="stats-grid" id="stats-grid"></div>
+            <div class="chart-grid">
+              <div class="chart-card">
+                <div class="chart-head">
+                  <span>Sentiment distribution</span>
+                  <span class="subtitle" id="sentiment-total"></span>
+                </div>
+                <div class="bars" id="sentiment-bars"></div>
+              </div>
+              <div class="chart-card">
+                <div class="chart-head">
+                  <span>Topic mix</span>
+                  <span class="subtitle">Current cluster run</span>
+                </div>
+                <div class="topic-mini-list" id="topic-mini-list"></div>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel split">
+            <div>
+              <div class="section-head">
+                <div>
+                  <div class="eyebrow">Topics</div>
+                  <h2>Current topics</h2>
+                </div>
+                <span class="subtitle" id="topics-count">0 items</span>
+              </div>
+              <div class="topic-list" id="topic-list"></div>
+            </div>
+            <div class="detail-pane">
+              <div class="section-head">
+                <div>
+                  <div class="eyebrow">Detail</div>
+                  <h2 id="detail-title">Select a topic</h2>
+                </div>
+                <span class="status-pill" id="detail-label">none</span>
+              </div>
+              <div id="detail-body" class="detail-body empty">
+                Pick a topic to inspect its messages and source conversations.
+              </div>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="section-head">
+              <div>
+                <div class="eyebrow">Report</div>
+                <h2>Generated markdown</h2>
+              </div>
+              <button class="button secondary" id="copy-report-button" type="button">
+                <span class="icon" aria-hidden="true">⧉</span>
+                Copy report
+              </button>
+            </div>
+            <pre id="report-output" class="report-output">No report yet.</pre>
+          </section>
+        </section>
+      </main>
+
+      <footer class="footer" id="footer-status">Ready.</footer>
+    </div>
+
+    <script type="module" src="/assets/app.js"></script>
+  </body>
+  </html>

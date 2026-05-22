@@ -1,3 +1,5 @@
+import sqlite3
+
 import pytest
 import pytest_asyncio
 from sqlalchemy import select
@@ -43,7 +45,10 @@ class FakeRedis:
 async def session_factory():
     engine = create_async_engine(
         "sqlite+aiosqlite://",
-        connect_args={"check_same_thread": False},
+        creator=lambda: sqlite3.connect(  # noqa: E731
+            ":memory:",
+            check_same_thread=False,
+        ),
         poolclass=StaticPool,
     )
     async with engine.begin() as connection:

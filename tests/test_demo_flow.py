@@ -1,3 +1,4 @@
+import sqlite3
 from pathlib import Path
 
 import pytest
@@ -26,7 +27,10 @@ from app.services.sample_data import sample_payloads, seed_sample_conversations
 async def session_factory():
     engine = create_async_engine(
         "sqlite+aiosqlite://",
-        connect_args={"check_same_thread": False},
+        creator=lambda: sqlite3.connect(  # noqa: E731
+            ":memory:",
+            check_same_thread=False,
+        ),
         poolclass=StaticPool,
     )
     async with engine.begin() as connection:
