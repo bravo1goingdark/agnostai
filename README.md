@@ -19,6 +19,9 @@ If you have `make`:
 make demo
 ```
 
+The first build downloads sentence-transformers, HDBSCAN, FAISS, and VADER
+(~2 GB). Subsequent runs use the cached image and start in seconds.
+
 ## Checks
 
 ```bash
