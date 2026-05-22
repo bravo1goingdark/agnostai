@@ -30,6 +30,11 @@ try:  # pragma: no cover - optional dependency path
 except Exception:  # pragma: no cover - optional dependency path
     np = None
 
+try:  # pragma: no cover - optional dependency path
+    faiss: Any | None = importlib.import_module("faiss")
+except Exception:  # pragma: no cover - optional dependency path
+    faiss = None
+
 STOPWORDS = {
     "about",
     "after",
@@ -532,8 +537,45 @@ def _build_memberships(
 ) -> list[TopicMembership]:
     message_lookup = {message["message_id"]: message for message in messages}
     topic_lookup = {topic.cluster_label: topic for topic in topics}
-    memberships: list[TopicMembership] = []
 
+    use_faiss = faiss is not None and np is not None and len(messages) >= 2
+    similarity_lookup: dict[tuple[str, int], float] = {}
+    if use_faiss and faiss is not None and np is not None:
+        _np: Any = np
+        _faiss: Any = faiss
+        indices_by_key: dict[tuple[str, int], int] = {}
+        query_embeddings: list[list[float]] = []
+        for message in messages:
+            for cluster in clusters:
+                if message["message_id"] in cluster.message_ids:
+                    key = (str(message["message_id"]), cluster.cluster_label)
+                    indices_by_key[key] = len(query_embeddings)
+                    query_embeddings.append(message["embedding"])
+        if query_embeddings:
+            query_array = _np.asarray(query_embeddings, dtype=_np.float32)
+            centroid_array = _np.asarray(
+                [
+                    [
+                        sum(values) / len(values)
+                        for values in zip(*cluster.embeddings, strict=False)
+                    ]
+                    for cluster in clusters
+                    if cluster.embeddings
+                ],
+                dtype=_np.float32,
+            )
+            if len(centroid_array) > 0:
+                _faiss.normalize_L2(query_array)
+                _faiss.normalize_L2(centroid_array)
+                idx = _faiss.IndexFlatIP(centroid_array.shape[1])
+                idx.add(centroid_array)
+                similarities, _ = idx.search(query_array, 1)
+                for key, query_index in indices_by_key.items():
+                    similarity_lookup[key] = float(
+                        max(-1.0, min(1.0, similarities[query_index][0]))
+                    )
+
+    memberships: list[TopicMembership] = []
     for cluster in clusters:
         topic = topic_lookup.get(cluster.cluster_label)
         if topic is None:
@@ -549,12 +591,19 @@ def _build_memberships(
             cluster.representative_message_id or cluster.message_ids[0]
         )
         for index, message in enumerate(cluster_messages):
+            if use_faiss:
+                key = (str(message["message_id"]), cluster.cluster_label)
+                similarity = similarity_lookup.get(key)
+                if similarity is None:
+                    similarity = _similarity(cluster, message["embedding"])
+            else:
+                similarity = _similarity(cluster, message["embedding"])
             memberships.append(
                 TopicMembership(
                     project_id=topic.project_id,
                     topic_id=topic.id,
                     message_id=message["message_id"],
-                    similarity=_similarity(cluster, message["embedding"]),
+                    similarity=similarity,
                     is_representative=message["message_id"] == representative_message_id
                     or index == 0,
                 )
