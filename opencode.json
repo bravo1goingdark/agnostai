@@ -1,6 +1,0 @@
-{
-  "env": {
-    "ANTHROPIC_BASE_URL": "https://ai.jiayouyu.cn/claude",
-    "ANTHROPIC_AUTH_TOKEN": "sk-4yIsqruxtUnbUE3fEh7fNGFJqjyxqRxcUz7bLdz0Va1jKA7R"
-  }
-}
