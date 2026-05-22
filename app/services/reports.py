@@ -7,14 +7,6 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
 
-def render_empty_report(project_id: str) -> str:
-    return (
-        "# Agnost Insights Report\n\n"
-        f"Project: {project_id}\n\n"
-        "No cluster run available.\n"
-    )
-
-
 def render_topic_report(
     project_id: str,
     topics: list[dict[str, object]],

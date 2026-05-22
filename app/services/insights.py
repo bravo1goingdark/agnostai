@@ -14,10 +14,3 @@ def empty_insights(project_id: str) -> dict[str, object]:
         "sentiment_distribution": {},
         "emerging_topics": [],
     }
-
-
-def summarize_queue_metrics(*, queued_jobs: int, failed_jobs: int) -> dict[str, int]:
-    return {
-        "queued_jobs": queued_jobs,
-        "failed_jobs": failed_jobs,
-    }

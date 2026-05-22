@@ -80,6 +80,7 @@ function formatPercent(value) {
 function setStatus(message, tone = "idle") {
   els.footerStatus.textContent = message;
   els.connectionStatus.textContent = tone;
+  els.connectionStatus.setAttribute("data-status", tone);
 }
 
 function apiUrl(path) {
@@ -87,18 +88,25 @@ function apiUrl(path) {
 }
 
 async function request(path, options = {}) {
-  const response = await fetch(apiUrl(path), {
-    headers: {
-      "Content-Type": "application/json",
-      ...(options.headers || {}),
-    },
-    ...options,
-  });
-  if (!response.ok) {
-    const body = await response.text();
-    throw new Error(`${response.status} ${response.statusText}: ${body}`);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
+  try {
+    const response = await fetch(apiUrl(path), {
+      signal: controller.signal,
+      headers: {
+        "Content-Type": "application/json",
+        ...(options.headers || {}),
+      },
+      ...options,
+    });
+    if (!response.ok) {
+      const body = await response.text();
+      throw new Error(`${response.status} ${response.statusText}: ${body}`);
+    }
+    return response;
+  } finally {
+    clearTimeout(timeout);
   }
-  return response;
 }
 
 async function fetchJson(path, options = {}) {
@@ -320,77 +328,91 @@ function renderReport() {
   els.reportOutput.textContent = state.reportText || "No report yet.";
 }
 
-async function loadTopicsOnly() {
-  const data = await fetchJson(`/v1/topics?project_id=${encodeURIComponent(state.config.projectId)}`);
-  state.topics = data.topics || [];
-  if (!state.selectedTopicId && state.topics.length) {
-    state.selectedTopicId = state.topics[0].id;
-  }
-  renderTopics();
-  renderTopicDetail();
-}
-
 async function loadTopic(topicId) {
-  const detail = await fetchJson(`/v1/topics/${encodeURIComponent(topicId)}`);
-  state.selectedTopicId = topicId;
-  state.topicDetail = detail;
-  renderTopics();
-  renderTopicDetail();
+    state.topicDetail = null;
+    renderTopicDetail();
+    try {
+        const detail = await fetchJson(`/v1/topics/${encodeURIComponent(topicId)}`);
+        state.selectedTopicId = topicId;
+        state.topicDetail = detail;
+        renderTopics();
+        renderTopicDetail();
+    } catch (error) {
+        state.selectedTopicId = null;
+        setStatus(error.message, "error");
+        renderTopics();
+    }
 }
 
 async function refreshDashboard() {
+  els.refreshButton.classList.add("is-spinning");
   setStatus("Refreshing...", "loading");
-  const [insights, topics, report] = await Promise.all([
-    fetchJson(`/v1/insights?project_id=${encodeURIComponent(state.config.projectId)}`),
-    fetchJson(`/v1/topics?project_id=${encodeURIComponent(state.config.projectId)}`),
-    fetchJson(`/v1/reports/current?project_id=${encodeURIComponent(state.config.projectId)}`),
-  ]);
+  try {
+    const [insights, topics, report] = await Promise.all([
+      fetchJson(`/v1/insights?project_id=${encodeURIComponent(state.config.projectId)}`),
+      fetchJson(`/v1/topics?project_id=${encodeURIComponent(state.config.projectId)}`),
+      fetchJson(`/v1/reports/current?project_id=${encodeURIComponent(state.config.projectId)}`),
+    ]);
 
-  state.insights = insights;
-  state.topics = topics.topics || [];
-  state.reportText = report.report_text || "No report yet.";
-  if (!state.selectedTopicId && state.topics.length) {
-    state.selectedTopicId = state.topics[0].id;
-  }
+    state.insights = insights;
+    state.topics = topics.topics || [];
+    state.reportText = report.report_text || "No report yet.";
+    if (!state.selectedTopicId && state.topics.length) {
+      state.selectedTopicId = state.topics[0].id;
+    }
 
-  renderStats();
-  renderSentimentBars();
-  renderTopicMiniList();
-  renderTopics();
-  renderReport();
-  if (state.selectedTopicId) {
-    await loadTopic(state.selectedTopicId);
+    renderStats();
+    renderSentimentBars();
+    renderTopicMiniList();
+    renderTopics();
+    renderReport();
+    if (state.selectedTopicId) {
+      await loadTopic(state.selectedTopicId);
+    }
+    setStatus(`Loaded ${state.config.projectId}`, "ok");
+  } finally {
+    els.refreshButton.classList.remove("is-spinning");
   }
-  setStatus(`Loaded ${state.config.projectId}`, "ok");
 }
 
 async function bootstrapSample() {
+  els.bootstrapButton.classList.add("is-spinning");
   setStatus("Bootstrapping sample project...", "loading");
-  const result = await fetchJson("/v1/demo/bootstrap", {
-    method: "POST",
-    body: JSON.stringify({ project_id: state.config.projectId }),
-  });
-  state.insights = result.insights;
-  state.reportText = result.report_text;
-  state.topics = result.topics || [];
-  state.selectedTopicId = state.topics[0]?.id || null;
-  renderStats();
-  renderSentimentBars();
-  renderTopicMiniList();
-  renderTopics();
-  renderReport();
-  if (state.selectedTopicId) {
-    await loadTopic(state.selectedTopicId);
+  try {
+    const result = await fetchJson("/v1/demo/bootstrap", {
+      method: "POST",
+      body: JSON.stringify({ project_id: state.config.projectId }),
+    });
+    state.insights = result.insights;
+    state.reportText = result.report_text;
+    state.topics = result.topics || [];
+    state.selectedTopicId = state.topics[0]?.id || null;
+    renderStats();
+    renderSentimentBars();
+    renderTopicMiniList();
+    renderTopics();
+    renderReport();
+    if (state.selectedTopicId) {
+      await loadTopic(state.selectedTopicId);
+    }
+    setStatus(
+      `Bootstrapped ${result.accepted} conversations, ${result.topic_count} topics`,
+      "ok",
+    );
+  } finally {
+    els.bootstrapButton.classList.remove("is-spinning");
   }
-  setStatus(
-    `Bootstrapped ${result.accepted} conversations, ${result.topic_count} topics`,
-    "ok",
-  );
 }
 
 async function copyReport() {
   await navigator.clipboard.writeText(state.reportText || "");
+  els.copyReportButton.classList.add("is-copied");
+  els.copyReportButton.innerHTML = '<span class="icon" aria-hidden="true">✓</span>Copied';
   setStatus("Report copied.", "ok");
+  setTimeout(() => {
+    els.copyReportButton.classList.remove("is-copied");
+    els.copyReportButton.innerHTML = '<span class="icon" aria-hidden="true">⧉</span>Copy report';
+  }, 1500);
 }
 
 function boot() {

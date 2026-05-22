@@ -1,5 +1,4 @@
 from hashlib import sha256
-from typing import Any
 from uuid import UUID
 
 from sqlalchemy import select
@@ -127,7 +126,3 @@ async def _find_latest_processing_job(
         .limit(1)
     )
     return result.scalar_one_or_none()
-
-
-def raw_payload_for_storage(payload: ConversationIngestRequest) -> dict[str, Any]:
-    return payload.model_dump(mode="json")

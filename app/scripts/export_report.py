@@ -9,7 +9,7 @@ from app.models.tables import Project
 from app.services.reports import write_current_topic_report
 
 
-async def _export(project_id: str) -> str:
+async def _export(project_id: str) -> int:
     async with SessionLocal() as session:
         project = await session.get(Project, project_id)
         if project is None:
@@ -20,7 +20,8 @@ async def _export(project_id: str) -> str:
             output_dir=Path("reports"),
         )
         print(report_file)
-        return report_file.read_text(encoding="utf-8")
+        print(report_file.read_text(encoding="utf-8"))
+        return 0
 
 
 def main() -> None:
