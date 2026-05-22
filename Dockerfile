@@ -15,7 +15,7 @@ COPY frontend ./frontend
 COPY alembic.ini ./
 COPY alembic ./alembic
 
-ARG PACKAGE_EXTRAS=""
+ARG PACKAGE_EXTRAS="[dev,ml]"
 RUN pip install --upgrade pip \
     && pip install ".${PACKAGE_EXTRAS}"
 
