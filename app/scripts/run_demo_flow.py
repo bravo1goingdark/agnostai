@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import sys
 from pathlib import Path
 
@@ -11,6 +12,7 @@ from app.services.sample_data import seed_sample_conversations
 
 
 async def _run(project_id: str) -> int:
+    report_dir = Path(os.environ.get("REPORT_DIR", "reports"))
     async with SessionLocal() as session:
         seed_result = await seed_sample_conversations(session, project_id)
         cluster_result = await run_cluster_batch(session, project_id)
@@ -18,7 +20,7 @@ async def _run(project_id: str) -> int:
         report_path = await write_current_topic_report(
             session,
             project_id,
-            output_dir=Path("reports"),
+            output_dir=report_dir,
         )
 
     print(

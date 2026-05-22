@@ -53,8 +53,9 @@ services:
     build: .
     command: >
       sh -c "
+        mkdir -p /tmp/reports &&
         echo '--- Seeding sample data ---' &&
-        agnost-demo-flow project-1 &&
+        REPORT_DIR=/tmp/reports agnost-demo-flow project-1 &&
         echo '--- Done. Dashboard at http://localhost:8000 ---'
       "
     env_file:
