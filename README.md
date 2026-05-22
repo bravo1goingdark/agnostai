@@ -7,11 +7,17 @@ requests, complaints, and blockers into queryable product insights.
 
 ```bash
 cp .env.example .env
-make demo
+docker compose up --build -d && docker compose run --rm demo
 ```
 
 That's it. Open **http://localhost:8000** — the dashboard loads with seeded
 sample data, clustered topics, and live insights.
+
+If you have `make`:
+
+```bash
+make demo
+```
 
 ## Checks
 
