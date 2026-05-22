@@ -7,79 +7,46 @@ requests, complaints, and blockers into queryable product insights.
 
 ```bash
 cp .env.example .env
-python -m venv .venv
-source .venv/bin/activate
-pip install -e ".[dev]"
-docker compose up -d postgres redis
-docker compose up
+make demo
 ```
 
-For the full topic pipeline:
+That's it. Open **http://localhost:8000** — the dashboard loads with seeded
+sample data, clustered topics, and live insights.
+
+## Checks
 
 ```bash
-pip install -e ".[dev,ml]"
+ruff check .      # lint
+mypy app          # type check
+pytest            # 34 tests
 ```
 
-## Run
+Or all three: `make check`
 
-API:
-
-```bash
-uvicorn app.main:app --reload
-```
-
-Worker:
+## CLI
 
 ```bash
-arq app.workers.arq_worker.WorkerSettings
-```
-
-The UI is available at `http://localhost:8000/`.
-
-Use the `Bootstrap sample` action in the dashboard to load the sample project.
-
-Run clustering:
-
-```bash
-agnost-run-clustering project-1
-```
-
-Export a report:
-
-```bash
-agnost-export-report project-1
-```
-
-One-command local demo after migrations:
-
-```bash
-agnost-demo-flow project-1
+agnost-demo-flow project-1       # seed → process → cluster → report
+agnost-recompute project-1       # rebuild derived data from raw conversations
+agnost-run-clustering project-1  # cluster only
+agnost-export-report project-1   # markdown report to stdout
 ```
 
 ## API
 
 ```http
-GET /healthz
+GET  /healthz
 POST /v1/conversations
-GET /v1/insights?project_id=...
-GET /v1/topics?project_id=...
-GET /v1/topics/{topic_id}
+GET  /v1/insights?project_id=...
+GET  /v1/topics?project_id=...
+GET  /v1/topics/{topic_id}
+GET  /v1/reports/current?project_id=...
+GET  /v1/observability?project_id=...
+GET  /v1/demo/bootstrap  (POST)
 ```
 
-## Notes
+## Architecture
 
-- `POST /v1/conversations` persists raw payloads and queues processing.
-- The worker normalizes messages, redacts obvious PII, scores sentiment, and
-  stores embeddings.
-- Batch clustering builds topics and memberships from stored messages.
-- The dashboard at `/` is served by the API container and reads the same
-  `/v1/*` endpoints.
-- `REASONING.md` covers the main tradeoffs.
-
-## Checks
-
-```bash
-ruff check .
-mypy app
-pytest
-```
+`REASONING.md` covers the full design — database choices (PostgreSQL + pgvector),
+algorithm selection (HDBSCAN, c-TF-IDF, FAISS), async worker pipeline (ARQ +
+Redis), and the production upgrade path.
