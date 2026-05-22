@@ -5,6 +5,10 @@ requests, complaints, and blockers into queryable product insights.
 
 ## Quickstart
 
+> **Warning**
+> The first build downloads sentence-transformers, HDBSCAN, FAISS, and VADER
+> (~2 GB). Subsequent runs use the cached image and start in seconds.
+
 ```bash
 cp .env.example .env
 docker compose up --build -d && docker compose run --rm demo
@@ -18,9 +22,6 @@ If you have `make`:
 ```bash
 make demo
 ```
-
-The first build downloads sentence-transformers, HDBSCAN, FAISS, and VADER
-(~2 GB). Subsequent runs use the cached image and start in seconds.
 
 ## Checks
 
