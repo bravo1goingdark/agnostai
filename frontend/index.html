@@ -4,19 +4,23 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Agnost — Conversation Intelligence</title>
+    <meta name="description" content="Turn AI-agent conversations into actionable product insights">
     <meta name="theme-color" content="#09090b">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/assets/styles.css">
   </head>
   <body>
     <div class="app-shell">
       <header class="topbar">
-        <span class="brand">Agnost</span>
+        <div>
+          <span class="brand">Agnost</span>
+          <span class="brand-sub">Conversation Intelligence</span>
+        </div>
         <div class="topbar-actions">
-          <button class="button" id="bootstrap-button" type="button">Seed sample data</button>
-          <button class="button ghost" id="refresh-button" type="button">Refresh</button>
+          <button class="button" id="bootstrap-button" type="button">⚡ Seed sample data</button>
+          <button class="button ghost" id="refresh-button" type="button">↻ Refresh</button>
         </div>
       </header>
 
@@ -35,7 +39,7 @@
           <div class="panel-header">
             <div class="panel-header-row">
               <h2 id="detail-title">Topic detail</h2>
-              <button class="button ghost" id="close-detail" type="button">Close</button>
+              <button class="button ghost" id="close-detail" type="button">✕ Close</button>
             </div>
             <div class="detail-meta" id="detail-meta"></div>
           </div>
@@ -75,4 +79,4 @@
 
     <script type="module" src="/assets/app.js"></script>
   </body>
-  </html>
+</html>
