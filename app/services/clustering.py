@@ -19,6 +19,7 @@ from app.models.tables import (
     Topic,
     TopicMembership,
 )
+from app.services.insights import generate_narrative_insights
 
 try:  # pragma: no cover - optional dependency path
     hdbscan: Any | None = importlib.import_module("hdbscan")
@@ -236,7 +237,7 @@ async def compute_insights(
         session, [topic.id for topic in topics]
     )
 
-    return {
+    result: dict[str, Any] = {
         "project_id": project_id,
         "latest_cluster_run_id": str(run.id) if run is not None else None,
         "generated_at": datetime.now(UTC),
@@ -255,6 +256,8 @@ async def compute_insights(
             if (topic.growth_24h or 0) > 0
         ][:5],
     }
+    result["narrative_insights"] = generate_narrative_insights(result)
+    return result
 
 
 async def _representative_texts_for_topics(

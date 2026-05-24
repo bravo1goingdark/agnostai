@@ -83,6 +83,7 @@ class InsightsResponse(BaseModel):
     top_topics: list[TopicSummary] = Field(default_factory=list)
     sentiment_distribution: dict[str, float | int] = Field(default_factory=dict)
     emerging_topics: list[TopicSummary] = Field(default_factory=list)
+    narrative_insights: list[str] = Field(default_factory=list)
 
 
 class ReportResponse(BaseModel):

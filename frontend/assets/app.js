@@ -129,6 +129,11 @@ function renderSummary() {
         <span class="insight-label" style="margin-top:8px">Growing</span>
         <span class="insight-text">${emerging.map(t => escapeHtml(t.label)).join(", ")}</span>
       ` : ""}
+      ${(insights?.narrative_insights || []).length ? `
+        <ul class="narrative-insights">
+          ${insights.narrative_insights.map(s => `<li>${escapeHtml(s)}</li>`).join("")}
+        </ul>
+      ` : ""}
     </div>
   `;
 }
